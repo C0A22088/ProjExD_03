@@ -7,6 +7,7 @@ import pygame as pg
 
 WIDTH = 1600  # ゲームウィンドウの幅
 HEIGHT = 900  # ゲームウィンドウの高さ
+NUM_OF_BOMBS = 5  # 爆弾の数
 
 
 def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
@@ -107,7 +108,30 @@ class Bomb:
         self.rct.move_ip(self.vx, self.vy)
         screen.blit(self.img, self.rct)
 
+class Explosion:
+    """
+    爆弾が爆発するエフェクトを出すクラス
+    """
 
+    def __init__(self,bomb: Bomb ,life: int):
+        img = pg.image.load("ex03/fig/explosion.gif")
+        self.imgs = [img, pg.transform.flip(img,True,True)]
+        self.img = self.imgs[0]
+        self.rct = self.img.get_rect(center=bomb.rct.center)
+        self.life = life
+
+    def update(self,screen:pg.Surface):
+        """
+        時間を減らし、画像を交互に切り替える
+        """
+        self.life -= 1
+        self.img = self.imgs[self.life//10%2]
+        screen.blit(self.img,self.rct)
+
+    def get_life(self):
+        return self.life
+    
+    
 class Beam:
     """
     こうかとんが放つビームに関するクラス
@@ -137,7 +161,10 @@ def main():
     screen = pg.display.set_mode((WIDTH, HEIGHT))    
     bg_img = pg.image.load("ex03/fig/pg_bg.jpg")
     bird = Bird(3, (900, 400))
-    bomb = Bomb((255, 0, 0), 10)
+    # bomb = Bomb((255, 0, 0), 10)
+    bombs = [Bomb((255, 0, 0), 10) for _ in range(NUM_OF_BOMBS)]
+    explosions : list[Explosion] = list()
+
     beam = None
 
     clock = pg.time.Clock()
@@ -151,7 +178,7 @@ def main():
                 
         screen.blit(bg_img, [0, 0])
         
-        if bomb is not None:
+        for bomb in bombs:
             if bird.rct.colliderect(bomb.rct):
                 # ゲームオーバー時に，こうかとん画像を切り替え，1秒間表示させる
                 bird.change_img(8, screen)
@@ -159,20 +186,30 @@ def main():
                 time.sleep(1)
                 return
         
-        if beam is not None and bomb is not None:
-            if bomb.rct.colliderect(beam.rct):
-                bomb = None
-                beam = None
+        for i, bomb in enumerate(bombs):
+            if beam is not None:
+                if bomb.rct.colliderect(beam.rct):
+                    explosions.append(Explosion(bomb,100))
+                    bombs[i] = None
+                    beam = None
+                    bird.change_img(6, screen)
+                    pg.display.update()
+            for i , explosion in enumerate(explosions):
+                if explosion is not None:
+                    explosion.update(screen)
+                if explosion.get_life() <= 0:
+                    del explosions[i]
 
         key_lst = pg.key.get_pressed()
         bird.update(key_lst, screen)
-        if bomb is not None:
+        bombs = [bomb for bomb in bombs if bomb is not None]
+        for bomb in bombs:
             bomb.update(screen)
         if beam is not None:
             beam.update(screen)
         pg.display.update()
         tmr += 1
-        clock.tick(50)
+        clock.tick(100)
 
 
 if __name__ == "__main__":
